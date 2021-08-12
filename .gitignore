@@ -1,0 +1,7 @@
+Build/
+.settings/
+obj/
+firmware.bin
+firmware.elf
+st-link_gdbserver_log.txt
+.vscode/
