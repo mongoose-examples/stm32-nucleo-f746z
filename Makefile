@@ -2,8 +2,9 @@ include generated_sources.mk
 
 PROG = firmware
 
-MONGOOSE_FLAGS = -DMG_ARCH=MG_ARCH_FREERTOS_LWIP
-MCU_FLAGS = -mcpu=cortex-m7 --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -DSTM32F746xx -DUSE_HAL_DRIVER -ffunction-sections -fstack-usage 
+MONGOOSE_FLAGS = -DMG_ARCH=MG_ARCH_FREERTOS_LWIP -DPATH_MAX=512 -D MG_ENABLE_DIRECTORY_LISTING=0
+MCU_FLAGS = -mcpu=cortex-m7 --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -DSTM32F746xx -DUSE_HAL_DRIVER -ffunction-sections -fstack-usage -ffunction-sections -fdata-sections
+
 
 PROJECT_ROOT_PATH = $(realpath $(CURDIR)/../..)
 DOCKER ?= docker run --rm -v $(PROJECT_ROOT_PATH):$(PROJECT_ROOT_PATH) -w $(CURDIR) mdashnet/armgcc
@@ -23,7 +24,7 @@ CFLAGS = -std=gnu11 -g3 -Os -W -Wall $(MCU_FLAGS) $(MONGOOSE_FLAGS) $(INCLUDES)
 CFLAGS += -Wno-unused-parameter
 
 LINKFLAGS =	-mcpu=cortex-m7 -T"SW4STM32/STM32746G_Nucleo/STM32F746ZGTx_FLASH.ld" --specs=nosys.specs \
-						-Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
+						-Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group -Wl,--gc-sections
 
 build: $(PROG).bin
 

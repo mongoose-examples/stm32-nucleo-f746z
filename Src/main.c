@@ -1,47 +1,47 @@
 /**
-  ******************************************************************************
-  * @file    main.c
-  * @author  MCD Application Team
-  * @brief   This file implements startup function and general implementation
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2016 STMicroelectronics International N.V.
-  * All rights reserved.</center></h2>
-  *
-  * Redistribution and use in source and binary forms, with or without
-  * modification, are permitted, provided that the following conditions are met:
-  *
-  * 1. Redistribution of source code must retain the above copyright notice,
-  *    this list of conditions and the following disclaimer.
-  * 2. Redistributions in binary form must reproduce the above copyright notice,
-  *    this list of conditions and the following disclaimer in the documentation
-  *    and/or other materials provided with the distribution.
-  * 3. Neither the name of STMicroelectronics nor the names of other
-  *    contributors to this software may be used to endorse or promote products
-  *    derived from this software without specific written permission.
-  * 4. This software, including modifications and/or derivative works of this
-  *    software, must execute solely and exclusively on microcontroller or
-  *    microprocessor devices manufactured by or for STMicroelectronics.
-  * 5. Redistribution and use of this software other than as permitted under
-  *    this license is void and will automatically terminate your rights under
-  *    this license.
-  *
-  * THIS SOFTWARE IS PROVIDED BY STMICROELECTRONICS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS, IMPLIED OR STATUTORY WARRANTIES, INCLUDING, BUT NOT
-  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-  * PARTICULAR PURPOSE AND NON-INFRINGEMENT OF THIRD PARTY INTELLECTUAL PROPERTY
-  * RIGHTS ARE DISCLAIMED TO THE FULLEST EXTENT PERMITTED BY LAW. IN NO EVENT
-  * SHALL STMICROELECTRONICS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-  * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
-  * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
-  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    main.c
+ * @author  MCD Application Team
+ * @brief   This file implements startup function and general implementation
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2016 STMicroelectronics International N.V.
+ * All rights reserved.</center></h2>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted, provided that the following conditions are met:
+ *
+ * 1. Redistribution of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 3. Neither the name of STMicroelectronics nor the names of other
+ *    contributors to this software may be used to endorse or promote products
+ *    derived from this software without specific written permission.
+ * 4. This software, including modifications and/or derivative works of this
+ *    software, must execute solely and exclusively on microcontroller or
+ *    microprocessor devices manufactured by or for STMicroelectronics.
+ * 5. Redistribution and use of this software other than as permitted under
+ *    this license is void and will automatically terminate your rights under
+ *    this license.
+ *
+ * THIS SOFTWARE IS PROVIDED BY STMICROELECTRONICS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS, IMPLIED OR STATUTORY WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NON-INFRINGEMENT OF THIRD PARTY INTELLECTUAL PROPERTY
+ * RIGHTS ARE DISCLAIMED TO THE FULLEST EXTENT PERMITTED BY LAW. IN NO EVENT
+ * SHALL STMICROELECTRONICS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ ******************************************************************************
+ */
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -49,6 +49,7 @@
 #include "ethernetif.h"
 #include "lwip/netif.h"
 #include "lwip/tcpip.h"
+#include "mongoose.h"
 #include "web_server.h"
 
 /* Private typedef -----------------------------------------------------------*/
@@ -59,149 +60,153 @@ struct netif s_netif; /* network interface structure */
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
-static void StartThread(void const * argument);
+static void StartThread(void const *argument);
 static void lwIP_Config(void);
 static void Error_Handler(void);
 static void MPU_Config(void);
 static void CPU_CACHE_Enable(void);
 
+UART_HandleTypeDef huart3;
+#define BIT(x) (1UL << (x))
+
 /* Private functions ---------------------------------------------------------*/
 
+static void InitUart3(void) {
+  RCC->APB1ENR |= BIT(18);
+  RCC->AHB1ENR |= BIT(3);
+
+  GPIO_InitTypeDef gc = {.Speed = GPIO_SPEED_HIGH,
+                         .Mode = GPIO_MODE_AF_PP,
+                         .Pull = GPIO_NOPULL,
+                         .Alternate = 7,
+                         .Pin = GPIO_PIN_8 | GPIO_PIN_9};
+  HAL_GPIO_Init(GPIOD, &gc);
+
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  HAL_UART_Init(&huart3);
+};
+
 /**
-  * @brief  Main program
-  * @param  None
-  * @retval None
-  */
-int main(void)
-{
-  /* Configure the MPU attributes as Device memory for ETH DMA descriptors */
-  MPU_Config();
-
-  /* Enable the CPU Cache */
-  CPU_CACHE_Enable();
-
-  /* STM32F7xx HAL library initialization:
-       - Configure the Flash ART accelerator on ITCM interface
-       - Configure the Systick to generate an interrupt each 1 msec
-       - Set NVIC Group Priority to 4
-       - Global MSP (MCU Support Package) initialization
-     */
+ * @brief  Main program
+ * @param  None
+ * @retval None
+ */
+int main(void) {
   HAL_Init();
-
-  /* Configure the system clock to 216 MHz */
   SystemClock_Config();
-
-  /*configure LED1, LED2 and LED3 */
   BSP_LED_Init(LED1);
   BSP_LED_Init(LED2);
   BSP_LED_Init(LED3);
+  InitUart3();
+  MPU_Config();
+  CPU_CACHE_Enable();
 
+  MG_INFO(("Starting network..."));
   /* Init thread */
 #if defined(__GNUC__)
-  osThreadDef(Start, StartThread, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 5);
+  osThreadDef(Start, StartThread, osPriorityNormal, 0,
+              configMINIMAL_STACK_SIZE * 5);
 #else
-  osThreadDef(Start, StartThread, osPriorityNormal, 0, configMINIMAL_STACK_SIZE * 2);
+  osThreadDef(Start, StartThread, osPriorityNormal, 0,
+              configMINIMAL_STACK_SIZE * 2);
 #endif
 
-  osThreadCreate (osThread(Start), NULL);
+  osThreadCreate(osThread(Start), NULL);
 
   /* Start scheduler */
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
-  for( ;; );
+  for (;;)
+    ;
 }
 
 /**
-  * @brief  Start Thread
-  * @param  argument not used
-  * @retval None
-  */
-static void StartThread(void const * argument)
-{
-  /* Create tcp_ip stack thread */
+ * @brief  Start Thread
+ * @param  argument not used
+ * @retval None
+ */
+static void StartThread(void const *argument) {
   tcpip_init(NULL, NULL);
-
-  /* Initialize the LwIP stack */
   lwIP_Config();
 
-  /* Notify user about the network interface config */
-  if (netif_is_up(&s_netif))
-  {
-    /* Turn On LED 1 to indicate ETH and LwIP init success*/
-    BSP_LED_On(LED1);
+  if (netif_is_up(&s_netif)) {
+    // uint32_t ip = s_netif.ip_addr.addr;
+    uint32_t ip = 0;
+    while ((ip = netif_dhcp_data(&s_netif)->offered_ip_addr.addr) == 0)
+      HAL_Delay(200);
+    MG_INFO(("Network is up, IP: %lu.%lu.%lu.%lu", ((ip >> 0) & 255),
+             ((ip >> 8) & 255), ((ip >> 16) & 255), ((ip >> 24) & 255)));
+    BSP_LED_On(LED1);  // Success: turn green LED on
+  } else {
+    MG_ERROR(("Error starting network"));
+    BSP_LED_On(LED3);  // Error - turn red LED on
   }
-  else
-  {
-   /* Turn On LED 3 to indicate ETH and LwIP init error */
-   BSP_LED_On(LED3);
-  }
-
 
   start_mongoose();
-
-  for( ;; )
-  {
-    /* Delete the Init Thread */
-    osThreadTerminate(NULL);
-  }
+  for (;;) osThreadTerminate(NULL);
 }
 
 /**
-  * @brief  Initializes the lwIP stack
-  * @param  None
-  * @retval None
-  */
-static void lwIP_Config(void)
-{
-  ip_addr_t ipaddr;
-  ip_addr_t netmask;
-  ip_addr_t gw;
-
-  IP_ADDR4(&ipaddr,IP_ADDR0,IP_ADDR1,IP_ADDR2,IP_ADDR3);
-  IP_ADDR4(&netmask,NETMASK_ADDR0,NETMASK_ADDR1,NETMASK_ADDR2,NETMASK_ADDR3);
-  IP_ADDR4(&gw,GW_ADDR0,GW_ADDR1,GW_ADDR2,GW_ADDR3);
+ * @brief  Initializes the lwIP stack
+ * @param  None
+ * @retval None
+ */
+static void lwIP_Config(void) {
+  ip_addr_t ipaddr = {.addr = 0};
+  ip_addr_t netmask = {.addr = 0};
+  ip_addr_t gw = {.addr = 0};
+#if 0
+  ip_addr_t ipaddr = {.addr = mg_htonl(0xc0a80214)};
+  ip_addr_t netmask = {.addr = mg_htonl(0xffffff00)};
+  ip_addr_t gw = {.addr = mg_htonl(0xc0a00201)};
+#endif
 
   /* add the network interface */
-  netif_add(&s_netif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &tcpip_input);
+  netif_add(&s_netif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init,
+            &tcpip_input);
 
   /*  Registers the default network interface. */
   netif_set_default(&s_netif);
 
-  if (netif_is_link_up(&s_netif))
-  {
+  if (netif_is_link_up(&s_netif)) {
     /* When the netif is fully configured this function must be called.*/
     netif_set_up(&s_netif);
-  }
-  else
-  {
+  } else {
     /* When the netif link is down this function must be called */
     netif_set_down(&s_netif);
   }
+  dhcp_start(&s_netif);
 }
 
 /**
-  * @brief  System Clock Configuration
-  *         The system Clock is configured as follow :
-  *            System Clock source            = PLL (HSE)
-  *            SYSCLK(Hz)                     = 216000000
-  *            HCLK(Hz)                       = 216000000
-  *            AHB Prescaler                  = 1
-  *            APB1 Prescaler                 = 4
-  *            APB2 Prescaler                 = 2
-  *            HSE Frequency(Hz)              = 8000000
-  *            PLL_M                          = 25
-  *            PLL_N                          = 432
-  *            PLL_P                          = 2
-  *            PLL_Q                          = 9
-  *            VDD(V)                         = 3.3
-  *            Main regulator output voltage  = Scale1 mode
-  *            Flash Latency(WS)              = 7
-  * @param  None
-  * @retval None
-  */
-static void SystemClock_Config(void)
-{
+ * @brief  System Clock Configuration
+ *         The system Clock is configured as follow :
+ *            System Clock source            = PLL (HSE)
+ *            SYSCLK(Hz)                     = 216000000
+ *            HCLK(Hz)                       = 216000000
+ *            AHB Prescaler                  = 1
+ *            APB1 Prescaler                 = 4
+ *            APB2 Prescaler                 = 2
+ *            HSE Frequency(Hz)              = 8000000
+ *            PLL_M                          = 25
+ *            PLL_N                          = 432
+ *            PLL_P                          = 2
+ *            PLL_Q                          = 9
+ *            VDD(V)                         = 3.3
+ *            Main regulator output voltage  = Scale1 mode
+ *            Flash Latency(WS)              = 7
+ * @param  None
+ * @retval None
+ */
+static void SystemClock_Config(void) {
   RCC_ClkInitTypeDef RCC_ClkInitStruct;
   RCC_OscInitTypeDef RCC_OscInitStruct;
 
@@ -215,56 +220,52 @@ static void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLN = 432;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 9;
-  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
     Error_Handler();
   }
 
   /* activate the OverDrive to reach the 216 Mhz Frequency */
-  if(HAL_PWREx_EnableOverDrive() != HAL_OK)
-  {
+  if (HAL_PWREx_EnableOverDrive() != HAL_OK) {
     Error_Handler();
   }
 
   /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2
      clocks dividers */
-  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
+  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK |
+                                 RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
-  if(HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_7) != HAL_OK)
-  {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_7) != HAL_OK) {
     Error_Handler();
   }
 }
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @param  None
-  * @retval None
-  */
-static void Error_Handler(void)
-{
+ * @brief  This function is executed in case of error occurrence.
+ * @param  None
+ * @retval None
+ */
+static void Error_Handler(void) {
   /* User may add here some code to deal with this error */
-  while(1)
-  {
+  while (1) {
   }
 }
 
 /**
-  * @brief  Configure the MPU attributes .
-  * @param  None
-  * @retval None
-  */
-static void MPU_Config(void)
-{
+ * @brief  Configure the MPU attributes .
+ * @param  None
+ * @retval None
+ */
+static void MPU_Config(void) {
   MPU_Region_InitTypeDef MPU_InitStruct;
 
   /* Disable the MPU */
   HAL_MPU_Disable();
 
-  /* Configure the MPU as Normal Non Cacheable for Ethernet Buffers in the SRAM2 */
+  /* Configure the MPU as Normal Non Cacheable for Ethernet Buffers in the SRAM2
+   */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
   MPU_InitStruct.BaseAddress = 0x2004C000;
   MPU_InitStruct.Size = MPU_REGION_SIZE_16KB;
@@ -299,12 +300,11 @@ static void MPU_Config(void)
 }
 
 /**
-  * @brief  CPU L1-Cache enable.
-  * @param  None
-  * @retval None
-  */
-static void CPU_CACHE_Enable(void)
-{
+ * @brief  CPU L1-Cache enable.
+ * @param  None
+ * @retval None
+ */
+static void CPU_CACHE_Enable(void) {
   /* Enable I-Cache */
   SCB_EnableICache();
 
@@ -312,23 +312,22 @@ static void CPU_CACHE_Enable(void)
   SCB_EnableDCache();
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t* file, uint32_t line)
-{
-  /* User can add his own implementation to report the file name and line number,
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
+void assert_failed(uint8_t *file, uint32_t line) {
+  /* User can add his own implementation to report the file name and line
+     number,
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 
   /* Infinite loop */
-  while (1)
-  {
+  while (1) {
   }
 }
 #endif
