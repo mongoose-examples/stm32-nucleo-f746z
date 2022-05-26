@@ -379,6 +379,7 @@
 #define LWIP_HTTPD_FS_ASYNC_READ      0
 #endif
 
+#if 0
 /** Filename (including path) to use as FS data file */
 #if !defined HTTPD_FSDATA_FILE || defined __DOXYGEN__
 /* HTTPD_USE_CUSTOM_FSDATA: Compatibility with deprecated lwIP option */
@@ -386,6 +387,7 @@
 #define HTTPD_FSDATA_FILE "fsdata_custom.c"
 #else
 #define HTTPD_FSDATA_FILE "fsdata.c"
+#endif
 #endif
 #endif
 

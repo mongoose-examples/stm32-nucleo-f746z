@@ -36,7 +36,7 @@
 #include <string.h>
 
 
-#include HTTPD_FSDATA_FILE
+//#include HTTPD_FSDATA_FILE
 
 /*-----------------------------------------------------------------------------------*/
 
@@ -56,7 +56,7 @@ int fs_read_custom(struct fs_file *file, char *buffer, int count);
 err_t
 fs_open(struct fs_file *file, const char *name)
 {
-  const struct fsdata_file *f;
+ // const struct fsdata_file *f;
 
   if ((file == NULL) || (name == NULL)) {
     return ERR_ARG;
@@ -70,6 +70,7 @@ fs_open(struct fs_file *file, const char *name)
   file->is_custom_file = 0;
 #endif /* LWIP_HTTPD_CUSTOM_FILES */
 
+#if 0
   for (f = FS_ROOT; f != NULL; f = f->next) {
     if (!strcmp(name, (const char *)f->name)) {
       file->data = (const char *)f->data;
@@ -87,6 +88,7 @@ fs_open(struct fs_file *file, const char *name)
       return ERR_OK;
     }
   }
+#endif
   /* file not found */
   return ERR_VAL;
 }
