@@ -1,6 +1,6 @@
 TARGET  = firmware
 CROSS   = arm-none-eabi
-CFLAGS  ?= -mcpu=cortex-m7 -std=gnu11 -g3 -DDEBUG -DMG_ARCH=MG_ARCH_FREERTOS_LWIP -DUSE_HAL_DRIVER -DSTM32F746xx -I./Core/Inc -I./Drivers/STM32F7xx_HAL_Driver/Inc -I./Drivers/STM32F7xx_HAL_Driver/Inc/Legacy -I./Drivers/CMSIS/Device/ST/STM32F7xx/Include -I./Drivers/CMSIS/Include -I./LWIP/App -I./LWIP/Target -I./Middlewares/Third_Party/LwIP/src/include -I./Middlewares/Third_Party/LwIP/system -I./Middlewares/Third_Party/FreeRTOS/Source/include -I./Middlewares/Third_Party/Mongoose -I./Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I./Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1 -I./Middlewares/Third_Party/LwIP/src/include/netif/ppp -I./Middlewares/Third_Party/LwIP/src/include/lwip -I./Middlewares/Third_Party/LwIP/src/include/lwip/apps -I./Middlewares/Third_Party/LwIP/src/include/lwip/priv -I./Middlewares/Third_Party/LwIP/src/include/lwip/prot -I./Middlewares/Third_Party/LwIP/src/include/netif -I./Middlewares/Third_Party/LwIP/src/include/compat/posix -I./Middlewares/Third_Party/LwIP/src/include/compat/posix/arpa -I./Middlewares/Third_Party/LwIP/src/include/compat/posix/net -I./Middlewares/Third_Party/LwIP/src/include/compat/posix/sys -I./Middlewares/Third_Party/LwIP/src/include/compat/stdc -I./Middlewares/Third_Party/LwIP/system/arch -I./Middlewares/Third_Party/LwIP/src/apps/http -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb
+CFLAGS  ?= -mcpu=cortex-m7 -std=gnu11 -g3 -DDEBUG -DMG_ARCH=MG_ARCH_FREERTOS_LWIP -DUSE_HAL_DRIVER -DSTM32F746xx -I./Core/Inc -I./Drivers/STM32F7xx_HAL_Driver/Inc -I./Drivers/STM32F7xx_HAL_Driver/Inc/Legacy -I./Drivers/CMSIS/Device/ST/STM32F7xx/Include -I./Drivers/CMSIS/Include -I./LWIP/App -I./LWIP/Target -I./Middlewares/Third_Party/LwIP/src/include -I./Middlewares/Third_Party/LwIP/system -I./Middlewares/Third_Party/FreeRTOS/Source/include -I./Middlewares/Third_Party/Mongoose -I./Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2 -I./Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM7/r0p1 -I./Middlewares/Third_Party/LwIP/src/include/netif/ppp -I./Middlewares/Third_Party/LwIP/src/include/lwip -I./Middlewares/Third_Party/LwIP/src/include/lwip/apps -I./Middlewares/Third_Party/LwIP/src/include/lwip/priv -I./Middlewares/Third_Party/LwIP/src/include/lwip/prot -I./Middlewares/Third_Party/LwIP/src/include/netif -I./Middlewares/Third_Party/LwIP/src/include/compat/posix -I./Middlewares/Third_Party/LwIP/src/include/compat/posix/arpa -I./Middlewares/Third_Party/LwIP/src/include/compat/posix/net -I./Middlewares/Third_Party/LwIP/src/include/compat/posix/sys -I./Middlewares/Third_Party/LwIP/src/include/compat/stdc -I./Middlewares/Third_Party/LwIP/system/arch -I./Middlewares/Third_Party/LwIP/src/apps/http -O0 -ffunction-sections -fdata-sections -Wall -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb
 LDFLAGS ?= -mcpu=cortex-m7  -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -T STM32F746ZGTX_FLASH.ld  --specs=nosys.specs -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 SOURCES = \
 	./Middlewares/Third_Party/Mongoose/mongoose.c \
@@ -130,14 +130,14 @@ SOURCES = \
 	./Core/Src/system_stm32f7xx.c \
 	./Core/Startup/startup_stm32f746zgtx.s
 
-OBJECTS = $(patsubst %.c, %.o, $(SOURCES))
+OBJECTS = $(patsubst %.s, %.o, $(patsubst %.c, %.o, $(SOURCES)))
 
 all build: $(TARGET).bin
 
 $(TARGET).bin: $(TARGET).elf
 	$(CROSS)-objcopy -O binary $< $@
 
-.c.o:
+.c.o .s.o:
 	$(CROSS)-gcc $? $(CFLAGS) -c -o $@
 
 $(TARGET).elf: $(OBJECTS)

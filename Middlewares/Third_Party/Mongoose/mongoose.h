@@ -20,7 +20,7 @@
 #ifndef MONGOOSE_H
 #define MONGOOSE_H
 
-#define MG_VERSION "7.6"
+#define MG_VERSION "7.7"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +38,8 @@ extern "C" {
 #define MG_ARCH_RTX_LWIP 8
 #define MG_ARCH_ZEPHYR 9
 #define MG_ARCH_NEWLIB 10
+#define MG_ARCH_RTX 11
+#define MG_ARCH_TIRTOS 12
 
 #if !defined(MG_ARCH)
 #if defined(__unix__) || defined(__APPLE__)
@@ -57,7 +59,7 @@ extern "C" {
 #endif
 
 #if !defined(MG_ARCH)
-#error "MG_ARCH is not specified and we couldn't guess it."
+#error "MG_ARCH is not specified and we couldn't guess it. Set -D MG_ARCH=..."
 #endif
 #endif  // !defined(MG_ARCH)
 
@@ -70,6 +72,8 @@ extern "C" {
 #if MG_ARCH == MG_ARCH_CUSTOM
 #include <mongoose_custom.h>
 #endif
+
+
 
 
 
@@ -128,6 +132,8 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+
+#include <esp_timer.h>
 
 #define MG_PATH_MAX 128
 
@@ -317,6 +323,36 @@ struct timeval {
 #endif
 
 
+#if MG_ARCH == MG_ARCH_RTX
+
+#include <ctype.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include <rl_net.h>
+
+#define MG_ENABLE_CUSTOM_MILLIS 1
+typedef int socklen_t;
+#define closesocket(x) closesocket(x)
+#define mkdir(a, b) (-1)
+#define EWOULDBLOCK BSD_EWOULDBLOCK
+#define EAGAIN BSD_EWOULDBLOCK
+#define EINPROGRESS BSD_EWOULDBLOCK
+#define EINTR BSD_EWOULDBLOCK
+#define ECONNRESET BSD_ECONNRESET
+#define EPIPE BSD_ECONNRESET
+#define TCP_NODELAY SO_KEEPALIVE
+
+#endif
+
+
 #if MG_ARCH == MG_ARCH_RTX_LWIP
 
 #include <ctype.h>
@@ -353,6 +389,27 @@ struct timeval {
 #define MG_PATH_MAX 128
 #endif
 
+
+#endif
+
+
+#if MG_ARCH == MG_ARCH_TIRTOS
+
+#include <stdlib.h>
+#include <ctype.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include <time.h>
+#include <errno.h>
+
+#include <sys/socket.h>
+
+extern int SockStatus(SOCKET hSock, int request, int *results );
+extern int SockSet(SOCKET hSock, int Type, int Prop, void *pbuf, int size);
 
 #endif
 
@@ -505,6 +562,7 @@ typedef int socklen_t;
 #include <sys/types.h>
 #include <time.h>
 
+#define MG_PUTCHAR(x) printk("%c", x)
 #define strerror(x) zsock_gai_strerror(x)
 #define FD_CLOEXEC 0
 #define F_SETFD 0
@@ -515,6 +573,10 @@ int sscanf(const char *, const char *, ...);
 
 #endif
 
+
+#ifndef MG_ENABLE_MIP
+#define MG_ENABLE_MIP 0
+#endif
 
 #ifndef MG_ENABLE_FATFS
 #define MG_ENABLE_FATFS 0
@@ -537,7 +599,7 @@ int sscanf(const char *, const char *, ...);
 #endif
 
 #ifndef MG_ENABLE_SSI
-#define MG_ENABLE_SSI 1
+#define MG_ENABLE_SSI 0
 #endif
 
 #ifndef MG_ENABLE_IPV6
@@ -596,7 +658,7 @@ int sscanf(const char *, const char *, ...);
 #endif
 
 #ifndef MG_SOCK_LISTEN_BACKLOG_SIZE
-#define MG_SOCK_LISTEN_BACKLOG_SIZE 128
+#define MG_SOCK_LISTEN_BACKLOG_SIZE 3
 #endif
 
 #ifndef MG_DIRSEP
@@ -609,6 +671,10 @@ int sscanf(const char *, const char *, ...);
 #else
 #define MG_ENABLE_FILE 0
 #endif
+#endif
+
+#ifndef MG_PUTCHAR
+#define MG_PUTCHAR(x) putchar(x)
 #endif
 
 
@@ -663,7 +729,6 @@ enum { MG_LL_NONE, MG_LL_ERROR, MG_LL_INFO, MG_LL_DEBUG, MG_LL_VERBOSE };
 void mg_log(const char *fmt, ...) PRINTF_LIKE(1, 2);
 bool mg_log_prefix(int ll, const char *file, int line, const char *fname);
 void mg_log_set(const char *spec);
-void mg_log_set_callback(void (*fn)(const void *, size_t, void *), void *param);
 void mg_hexdump(const void *buf, size_t len);
 
 #define MG_LOG(level, args)                                                \
@@ -684,14 +749,13 @@ struct mg_timer {
   uint64_t prev_ms;         // Timestamp of a previous poll
   uint64_t expire;          // Expiration timestamp in milliseconds
   unsigned flags;           // Possible flags values below
-#define MG_TIMER_REPEAT 1   // Call function periodically, otherwise run once
+#define MG_TIMER_ONCE 0     // Call function once
+#define MG_TIMER_REPEAT 1   // Call function periodically
 #define MG_TIMER_RUN_NOW 2  // Call immediately when timer is set
   void (*fn)(void *);       // Function to call
   void *arg;                // Function argument
-  struct mg_timer *next;    // Linkage in g_timers list
+  struct mg_timer *next;    // Linkage
 };
-
-extern struct mg_timer *g_timers;  // Global list of timers
 
 void mg_timer_init(struct mg_timer **head, struct mg_timer *timer,
                    uint64_t milliseconds, unsigned flags, void (*fn)(void *),
@@ -726,7 +790,7 @@ struct mg_fs {
 };
 
 extern struct mg_fs mg_fs_posix;   // POSIX open/close/read/write/seek
-extern struct mg_fs mg_fs_packed;  // Packed FS, see examples/complete
+extern struct mg_fs mg_fs_packed;  // Packed FS, see examples/device-dashboard
 extern struct mg_fs mg_fs_fat;     // FAT FS
 
 // File descriptor
@@ -1106,7 +1170,7 @@ size_t mg_ws_wrap(struct mg_connection *, size_t len, int op);
 
 struct mg_connection *mg_sntp_connect(struct mg_mgr *mgr, const char *url,
                                       mg_event_handler_t fn, void *fn_data);
-void mg_sntp_send(struct mg_connection *c, unsigned long utc);
+void mg_sntp_request(struct mg_connection *c);
 int64_t mg_sntp_parse(const unsigned char *buf, size_t len);
 
 
@@ -1207,6 +1271,27 @@ void mg_resolve_cancel(struct mg_connection *);
 bool mg_dns_parse(const uint8_t *buf, size_t len, struct mg_dns_message *);
 size_t mg_dns_parse_rr(const uint8_t *buf, size_t len, size_t ofs,
                        bool is_question, struct mg_dns_rr *);
+
+
+
+
+
+struct mip_driver {
+  void *data;                                       // Driver-specific data
+  void (*init)(void *data);                         // Initialise driver
+  size_t (*tx)(const void *, size_t, void *data);   // Transmit frame
+  size_t (*rx)(void *buf, size_t len, void *data);  // Receive frame (polling)
+  bool (*status)(void *data);                       // Up/down status
+  // Set receive callback for interrupt-driven drivers
+  void (*rxcb)(void (*fn)(void *buf, size_t len, void *rxdata), void *rxdata);
+};
+
+struct mip_ipcfg {
+  uint8_t mac[6];         // MAC address. Must not be 0
+  uint32_t ip, mask, gw;  // IP, netmask, GW. If IP is 0, DHCP is used
+};
+
+void mip_init(struct mg_mgr *, struct mip_ipcfg *, struct mip_driver *);
 
 #ifdef __cplusplus
 }
