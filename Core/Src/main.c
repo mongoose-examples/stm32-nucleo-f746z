@@ -355,7 +355,7 @@ void StartDefaultTask(void *argument) {
          ((ip >> 8) & 255), ((ip >> 16) & 255), ((ip >> 24) & 255));
 
 #ifdef MG
-  mg_log_set("4");
+  mg_log_set(MG_LL_DEBUG);
   struct mg_mgr mgr;
   mg_mgr_init(&mgr);
   MG_INFO(("Starting server ...."));
